@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+python-dotenv
+google-cloud-aiplatform
+google-generativeai
+langchain-google-vertexai
+google-adk
+toolbox-core
+PyJWT
+flask requests
