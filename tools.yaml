@@ -1,0 +1,299 @@
+# Benifix MCP Tools Configuration
+# NOTE: All 'statement' blocks marked as CHALLENGE are left incomplete and must be written by the participants.
+
+sources:
+  # AlloyDB PostgreSQL Database
+  benifix-alloydb-source:
+    kind: postgres
+    host: <host_ip>
+    port: 5432
+    database: <db>
+    user: postgres
+    password: <password>
+  
+  # HTTP source for Places API proxy with Geocoding
+  places-api-source:
+    kind: http
+    baseUrl: http://localhost:8080
+
+tools:
+  # ============================================================================
+  # CHALLENGE 1: Foundational Tools (Build & Connect)
+  # ============================================================================
+  
+  # CHALLENGE 1 (Part A): Find Providers Tool
+  find-providers:
+    kind: postgres-sql
+    source: benifix-alloydb-source
+    description: >
+      Finds in-network healthcare providers for a given specialty.
+      Returns provider name, specialty, location, and network status.
+    parameters:
+      - name: specialty
+        type: string
+        description: The type of provider to search for (e.g., 'dentist', 'therapist', 'cardiologist')
+    statement: |
+      -- CHALLENGE 1.1: Write a SQL query to find IN_NETWORK providers by specialty ($1)
+      -- Expected columns: provider_name, specialty, network_status, location
+      
+  # CHALLENGE 1 (Part B): Get Employee Benefits Tool
+  get-employee-benefits:
+    kind: postgres-sql
+    source: benifix-alloydb-source
+    description: >
+      Retrieves comprehensive benefits details for a specific employee.
+      Returns plan name, deductible, out-of-pocket maximum, and HSA eligibility.
+    parameters:
+      - name: employee_id
+        type: string
+        description: The unique identifier for the employee
+    statement: |
+      -- CHALLENGE 1.2: Write a SQL query to retrieve all benefits details for employee_id ($1)
+      -- Expected columns: employee_id, plan_name, individual_deductible, individual_oop_max, hsa_eligible, last_updated
+
+  # ============================================================================
+  # CHALLENGE 2: Advanced Data Handling (Semantic Search)
+  # ============================================================================
+  
+  # CHALLENGE 2 (Part A): Semantic Policy Search Tool
+  search-policy-documents:
+    kind: postgres-sql
+    source: benifix-alloydb-source
+    description: >
+      Searches through benefits policy documents from various countries.
+      Returns the most relevant policy document chunks for a given query.
+      Searches across content text to find matching information about benefits, 
+      coverage, eligibility, and policy details.
+    parameters:
+      - name: query_text
+        type: string
+        description: The search query or question about benefits policies
+      - name: max_results
+        type: integer
+        description: Maximum number of policy chunks to return (default 5)
+    statement: |
+      -- CHALLENGE 2.1: Write a SQL query to search document_chunks for query_text ($1)
+      -- using LIKE (case-insensitive) and limit results by max_results ($2)
+      -- Expected columns: id, source_document_name, chunk_index, country, content
+      
+  # Utility for Challenge 2 (Kept complete)
+  search-policy-by-country:
+    kind: postgres-sql
+    source: benifix-alloydb-source
+    description: >
+      Searches policy documents for a specific country.
+      Useful when user asks about benefits in a particular country.
+      Returns relevant document chunks with country-specific information.
+    parameters:
+      - name: country
+        type: string
+        description: The country to search for (e.g., 'Argentina', 'Brazil')
+      - name: query_text
+        type: string
+        description: What to search for within that country's policies
+      - name: max_results
+        type: integer
+        description: Maximum results to return (default 10)
+    statement: |
+      SELECT
+        id,
+        source_document_name,
+        chunk_index,
+        country,
+        content
+      FROM
+        document_chunks
+      WHERE
+        LOWER(country) = LOWER($1)
+        AND LOWER(content) LIKE '%' || LOWER($2) || '%'
+      ORDER BY
+        chunk_index
+      LIMIT $3;
+
+  # Utility for Challenge 2 (Kept complete)
+  list-policy-countries:
+    kind: postgres-sql
+    source: benifix-alloydb-source
+    description: >
+      Lists all countries that have policy documents in the database.
+      Useful for understanding what country-specific information is available.
+    parameters: []
+    statement: |
+      SELECT DISTINCT
+        country,
+        COUNT(*) as chunk_count,
+        COUNT(DISTINCT source_document_name) as document_count
+      FROM
+        document_chunks
+      GROUP BY
+        country
+      ORDER BY
+        country;
+
+  # ============================================================================
+  # CHALLENGE 3: Numerical & Predictive Analysis (Cost Forecast)
+  # ============================================================================
+  
+  # CHALLENGE 3 (Part A): Annual Cost Prediction - Benefits Data Retrieval
+  get-employee-plan-details:
+    kind: postgres-sql
+    source: benifix-alloydb-source
+    description: >
+      Retrieves employee plan details needed for cost prediction analysis.
+      Returns plan name, deductible, and out-of-pocket maximum.
+      Used as first step in annual cost estimation workflow.
+    parameters:
+      - name: employee_id
+        type: string
+        description: The unique identifier for the employee
+    statement: |
+      -- CHALLENGE 3.1: Write a SQL query to retrieve plan name, deductible, OOP max, and HSA eligibility for employee_id ($1)
+      -- Expected columns: employee_id, plan_name, individual_deductible, individual_oop_max, hsa_eligible
+
+  # CHALLENGE 3 (Part B): Usage Profile Data for Cost Estimation
+  get-usage-profile-assumptions:
+    kind: postgres-sql
+    source: benifix-alloydb-source
+    description: >
+      Retrieves estimated annual healthcare usage and cost assumptions
+      for different user profiles (low, average, high).
+      Use this to predict annual costs based on expected healthcare utilization.
+    parameters:
+      - name: profile_type
+        type: string
+        description: The usage profile type ('low', 'average', or 'high')
+    statement: |
+      -- CHALLENGE 3.2: Write a SQL query to retrieve usage profiles by profile_type ($1)
+      -- Expected columns: profile_type, estimated_annual_visits, estimated_claims_amount, description
+
+  # ============================================================================
+  # CHALLENGE 4: Places API Integration with Geocoding
+  # ============================================================================
+  
+  # CHALLENGE 4 (Part A): Get Provider Locations from Database
+  get-provider-locations:
+    kind: postgres-sql
+    source: benifix-alloydb-source
+    description: >
+      Retrieves provider location data from the database.
+      Returns in-network providers with their addresses.
+      Use this as the first step before calling Places API.
+    parameters:
+      - name: specialty
+        type: string
+        description: The provider specialty to search for
+      - name: location_filter
+        type: string
+        description: Optional location filter (can be empty string)
+    statement: |
+      -- CHALLENGE 5.1: Write a SQL query to get in-network provider name, specialty, and location 
+      -- by specialty ($1) and an optional location_filter ($2).
+      -- Expected columns: provider_name, specialty, location, network_status
+
+  # CHALLENGE 4 (Part B): Find Nearest Provider by Street Address (Kept complete)
+  find-closest-provider-by-address:
+    kind: http
+    source: places-api-source
+    method: GET
+    path: /nearby-search
+    description: >
+      Finds the closest healthcare providers using Google Maps Places API with automatic geocoding.
+      Accepts a street address (e.g., '123 Main St, Anytown, CA') and converts it to coordinates.
+      Returns up to 5 nearby providers with names, addresses, ratings, and coordinates.
+      Use this when the user provides a street address or location name.
+    queryParams:
+      - name: query
+        type: string
+        description: The type of provider to search for (e.g., 'dentist', 'cardiologist')
+      - name: address
+        type: string
+        description: Street address to search near (e.g., '123 Main St, Anytown, CA' or 'Times Square, New York')
+      - name: radius
+        type: string
+        description: Search radius in meters (default 50000 for 50km, optional)
+
+  # CHALLENGE 4 (Part C): Find Nearest Provider by Coordinates (Kept complete)
+  find-closest-provider-by-coordinates:
+    kind: http
+    source: places-api-source
+    method: GET
+    path: /nearby-search
+    description: >
+      Finds the closest healthcare providers using Google Maps Places API.
+      Searches near specified latitude and longitude coordinates.
+      Returns up to 5 nearby providers with names, addresses, ratings, and coordinates.
+      Use this when the user provides specific GPS coordinates.
+    queryParams:
+      - name: query
+        type: string
+        description: The type of provider to search for (e.g., 'dentist', 'cardiologist')
+      - name: latitude
+        type: string
+        description: The user's current latitude coordinate (e.g., '37.7749')
+      - name: longitude
+        type: string
+        description: The user's current longitude coordinate (e.g., '-122.4194')
+      - name: radius
+        type: string
+        description: Search radius in meters (default 50000 for 50km, optional)
+
+  # ============================================================================
+  # ADDITIONAL UTILITY TOOLS (Kept complete)
+  # ============================================================================
+  
+
+  # Get All Benefits Plans Summary
+  get-all-benefits-summary:
+    kind: postgres-sql
+    source: benifix-alloydb-source
+    description: >
+      Retrieves a summary of all available benefit plans in the system.
+      Useful for comparing plans or getting an overview.
+      Shows average costs and employee enrollment counts per plan.
+    parameters: []
+    statement: |
+      SELECT DISTINCT
+        plan_name,
+        AVG(individual_deductible) as avg_deductible,
+        AVG(individual_oop_max) as avg_oop_max,
+        COUNT(*) as employee_count
+      FROM
+        benefits
+      GROUP BY
+        plan_name
+      ORDER BY
+        plan_name;
+
+  
+
+# ============================================================================
+# TOOLSET DEFINITIONS - Grouping Related Tools by Challenge (Kept complete)
+# ============================================================================
+
+toolsets:
+  # Main benefits assistant with core functionality
+  benifix-benefits-assistant:
+    - find-providers
+    - get-employee-benefits
+    - get-employee-plan-details
+    - check-employee-deductible
+    - get-all-benefits-summary
+  
+  # Challenge 2: Policy search and document analysis
+  benifix-policy-search:
+    - search-policy-documents
+    - search-policy-by-country
+    - list-policy-countries
+  
+  # Challenge 3: Cost analysis and prediction
+  benifix-cost-analysis:
+    - get-employee-plan-details
+    - get-usage-profile-assumptions
+  
+  
+  # Challenge 4: Provider network with location services
+  benifix-provider-network:
+    - find-providers
+    - get-provider-locations
+    - find-closest-provider-by-address
+    - find-closest-provider-by-coordinates
