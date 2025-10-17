@@ -21,8 +21,19 @@ The provided codebase already includes the following environment:
 ### **Setup Instructions**
 
 1. **Start the Backend:** Ensure your backend services (Flask API, Places Proxy) are running on their configured ports.  
-2. **Start the MCP Toolbox:**  
-   ./toolbox \--tools-file tools.yaml
+2. **Install MCP Toolbox**  
+   * For the latest version, check the [releases page](https://github.com/googleapis/genai-toolbox/releases) and use the following instructions for your OS and CPU architecture. 
+
+```
+# see releases page for other versions
+export VERSION=0.17.0
+curl -L -o toolbox https://storage.googleapis.com/genai-toolbox/v$VERSION/linux/amd64/toolbox
+chmod +x toolbox
+
+```
+
+   * **Start the MCP Toolbox:**  
+     ./toolbox \--tools-file tools.yaml
 
 3. **Run the Agent:**  
    python agent.py
