@@ -17,7 +17,7 @@ os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "TRUE"
 os.environ["GOOGLE_CLOUD_LOCATION"] = "us-central1"
 
 # --- Global Configuration ---
-PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT", "<Project Name>")
+PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT", "hackathon-473214")
 LOCATION = "us-central1"
 TOOLBOX_URL = os.getenv("TOOLBOX_URL", "http://localhost:5000/mcp")
 
@@ -27,7 +27,7 @@ logging.basicConfig(level=logging.INFO)
 print(f"Using PROJECT_ID={PROJECT_ID}, LOCATION={LOCATION}")
 print(f"Connecting to MCP Toolbox at: {TOOLBOX_URL}")
 
-# --- System Prompt (Challenge 3.3 and 5.2 are Prompt Engineering Tasks) ---
+# --- System Prompt ---
 prompt = """
 You are the Benifix Smart Benefits Assistant. Your primary goal is to provide accurate, 
 helpful, and actionable information to employees regarding their benefits.
@@ -40,24 +40,30 @@ IMPORTANT BEHAVIOR RULES:
 5. If a query requires a specific employee ID and the user has not provided one, ask for it.
 
 AVAILABLE CAPABILITIES (via MCP Tools):
-- **find-providers**: Search for in-network healthcare providers by specialty (Challenge 1)
-- **get-employee-benefits**: Retrieve comprehensive employee benefits information (Challenge 1)
-- **get-employee-plan-details**: Get specific plan details for cost predictions (Challenge 3)
-- **search-policy-documents**: Search benefits policy documents for coverage details (Challenge 2)
-- **check-employee-deductible**: Check if employee qualifies for low-deductible alerts (Challenge 4)
-- **get-support-ticket-status**: Check status of support tickets (Utility)
-- **get-provider-locations**: Get provider location information for mapping (Challenge 5)
-- **get-usage-profile-assumptions**: Get healthcare usage profiles for cost estimation (Challenge 3)
-- **find-closest-provider-by-address**: Use Google Places API to find closest provider based on street address (Challenge 5)
-- **find-closest-provider-by-coordinates**: Use Google Places API to find closest provider based on GPS coordinates (Challenge 5)
+- **find-providers**: Search for in-network healthcare providers by specialty
+- **get-employee-benefits**: Retrieve comprehensive employee benefits information
+- **get-employee-plan-details**: Get specific plan details for cost predictions
+- **search-policy-documents**: Search benefits policy documents for coverage details
+- **check-employee-deductible**: Check if employee qualifies for low-deductible alerts
+- **get-support-ticket-status**: Check status of support tickets
+- **get-provider-locations**: Get provider location information for mapping
+- **get-usage-profile-assumptions**: Get healthcare usage profiles for cost estimation
+- **find-nearest-provider**: Use Google Places API to find closest provider based on user location
 
 TOOL USAGE GUIDELINES:
 - For benefit inquiries: Use get-employee-benefits or get-employee-plan-details
 - For provider searches: Use find-providers
 - For policy questions: Use search-policy-documents
-- For cost predictions: Chain get-employee-plan-details + get-usage-profile-assumptions
+- For cost predictions: Use get-employee-plan-details + get-usage-profile-assumptions
 - For deductible alerts: Use check-employee-deductible
-- For finding nearest provider: Chain get-provider-locations (database) and one of the find-closest tools (Google Places)
+- **For finding nearest provider: FIRST call get-provider-locations to get in-network providers, THEN call find-nearest-provider with user's location to find the closest one**
+
+CHALLENGE 5 - FIND NEAREST PROVIDER WORKFLOW:
+When a user asks to find the closest/nearest provider:
+1. FIRST: Call get-provider-locations with the specialty to get in-network providers from our database
+2. SECOND: Call find-nearest-provider with user's current location (latitude/longitude) to use Google Places API
+3. Combine the results: Match in-network providers with nearby locations from Places API
+4. Recommend the provider that is both in-network AND closest to the user
 
 RESPONSE FORMAT:
 - Present information clearly with relevant details
@@ -106,7 +112,7 @@ else:
     print("⚠ Agent running without MCP tools")
 
 
-# --- Async Query Function Using Runner (Kept complete) ---
+# --- Async Query Function Using Runner ---
 async def run_query_async(query: str, employee_id: str = None, user_id: str = "user", session_id: str = None):
     """Run a query against the agent using the proper Runner pattern"""
     try:
@@ -165,13 +171,13 @@ async def run_query_async(query: str, employee_id: str = None, user_id: str = "u
                         for part in event.content.parts:
                             if hasattr(part, 'function_call'):
                                 tool_name = part.function_call.name
-                                print(f"\n Calling tool: {tool_name}")
+                                print(f"\n🔧 Calling tool: {tool_name}")
                                 tool_calls.append(tool_name)
         
         print("\n")
         
         if tool_calls:
-            print(f"Tools used: {', '.join(tool_calls)}")
+            print(f"📊 Tools used: {', '.join(tool_calls)}")
         
         return response_text
         
@@ -183,10 +189,45 @@ async def run_query_async(query: str, employee_id: str = None, user_id: str = "u
         return None
 
 
-# --- Synchronous Wrapper (Kept complete) ---
+# --- Synchronous Wrapper ---
 def run_query(query: str, employee_id: str = None):
     """Synchronous wrapper for run_query_async"""
     return asyncio.run(run_query_async(query, employee_id))
+
+
+# --- Example Test Queries ---
+async def run_examples_async():
+    """Run example queries to test the MCP toolbox integration"""
+    
+    print("\n" + "="*60)
+    print("BENIFIX AGENT - MCP TOOLBOX INTEGRATION TEST")
+    print("="*60)
+    
+    print("\n### Example 1: Provider Search ###")
+    await run_query_async("Find me a dentist")
+    
+    print("\n### Example 2: Employee Benefits ###")
+    await run_query_async("What are my benefits?", employee_id="123")
+    
+    print("\n### Example 3: Benefits + Provider Search ###")
+    await run_query_async(
+        "What's my deductible, and can you find me a dentist?",
+        employee_id="123"
+    )
+    
+    print("\n### Example 4: Deductible Alert ###")
+    await run_query_async(
+        "Check if I'm eligible for a low-deductible alert",
+        employee_id="456"
+    )
+    
+    print("\n### Example 5: Support Ticket Status ###")
+    await run_query_async("What's the status of support ticket 1001?")
+
+
+def run_examples():
+    """Synchronous wrapper for run_examples_async"""
+    asyncio.run(run_examples_async())
 
 
 if __name__ == "__main__":
@@ -202,11 +243,14 @@ if __name__ == "__main__":
     
     print("\n✓ MCP Toolbox Ready")
     
-    if len(sys.argv) > 1:
+    if "--examples" in sys.argv:
+        run_examples()
+    elif len(sys.argv) > 1:
         query = " ".join(sys.argv[1:])
         run_query(query)
     else:
         print("\nAgent ready for queries.")
         print("\nUsage:")
+        print("  python agent.py --examples              # Run test queries")
         print("  python agent.py 'your question here'    # Run a single query")
-        print("  adk web --agent agent:root_agent        # Start web UI (For Challenge 6 Deployment)")
+        print("  adk web --agent agent:root_agent        # Start web UI")
