@@ -1,8 +1,8 @@
-# **🚀 Benifix AI Agent Hackathon: Building a Smart Benefits Assistant**
+# **🚀 Benifex AI Agent Hackathon: Building a Smart Benefits Assistant**
 
 ## **Theme: AI Agent Tooling and Workflow**
 
-Welcome to the Benifix Hackathon\! Your challenge is to transform a basic benefits assistant into a powerful, intelligent agent capable of advanced data retrieval, complex analysis, and system interaction using the Google Agent Development Kit (ADK) and the Gemini model.
+Welcome to the Benifex Hackathon\! Your challenge is to transform a basic benefits assistant into a powerful, intelligent agent capable of advanced data retrieval, complex analysis, and system interaction using the Google Agent Development Kit (ADK) and the Gemini model.
 
 The goal is to master **Tool Creation**, **Tool Chaining**, and **Prompt Engineering** to solve real-world employee benefits problems.
 
@@ -103,4 +103,4 @@ The places\_proxy.py file requires a **Google Maps API Key**. For this challenge
 | **6.2 Chat Logic** | *New HTML File* | Implement JavaScript logic to send the user's query and a **Session ID** as a structured JSON object to a mock API endpoint (`/agent/chat`) and parse the agent's JSON response, ensuring **multi-turn history** is maintained in the UI.. |
 | **6.3 Agent Integration (Conceptual)** | *New HTML File* | Demonstrate the integration by having the chat client send and receive structured JSON data, proving that the front-end is ready to connect to the deployed Gemini/ADK service. |
 
-Good luck, Benifix Hackathon participants\! May the tools be ever in your favor.
+Good luck, Benifex Hackathon participants\! May the tools be ever in your favor.
