@@ -1,15 +1,15 @@
 # Benifix MCP Tools Configuration
-# NOTE: All 'statement' blocks marked as CHALLENGE are left incomplete and must be written by the participants.
+# Complete tools.yaml with all challenges implemented
 
 sources:
   # AlloyDB PostgreSQL Database
   benifix-alloydb-source:
     kind: postgres
-    host: <host_ip>
+    host: 10.91.224.2
     port: 5432
-    database: <db>
+    database: postgres
     user: postgres
-    password: <password>
+    password: 9b4dda8d7e7f9a4f5d2b9445
   
   # HTTP source for Places API proxy with Geocoding
   places-api-source:
@@ -18,7 +18,7 @@ sources:
 
 tools:
   # ============================================================================
-  # CHALLENGE 1: Foundational Tools (Build & Connect)
+  # CHALLENGE 1: Basic Provider and Benefits Tools
   # ============================================================================
   
   # CHALLENGE 1 (Part A): Find Providers Tool
@@ -33,9 +33,19 @@ tools:
         type: string
         description: The type of provider to search for (e.g., 'dentist', 'therapist', 'cardiologist')
     statement: |
-      -- CHALLENGE 1.1: Write a SQL query to find IN_NETWORK providers by specialty ($1)
-      -- Expected columns: provider_name, specialty, network_status, location
-      
+      SELECT
+        provider_name,
+        specialty,
+        network_status,
+        location
+      FROM
+        providers
+      WHERE
+        LOWER(specialty) LIKE '%' || LOWER($1) || '%'
+        AND network_status = 'IN_NETWORK'
+      ORDER BY
+        provider_name;
+
   # CHALLENGE 1 (Part B): Get Employee Benefits Tool
   get-employee-benefits:
     kind: postgres-sql
@@ -48,11 +58,20 @@ tools:
         type: string
         description: The unique identifier for the employee
     statement: |
-      -- CHALLENGE 1.2: Write a SQL query to retrieve all benefits details for employee_id ($1)
-      -- Expected columns: employee_id, plan_name, individual_deductible, individual_oop_max, hsa_eligible, last_updated
+      SELECT
+        employee_id,
+        plan_name,
+        individual_deductible,
+        individual_oop_max,
+        hsa_eligible,
+        last_updated
+      FROM
+        benefits
+      WHERE
+        employee_id = $1;
 
   # ============================================================================
-  # CHALLENGE 2: Advanced Data Handling (Semantic Search)
+  # CHALLENGE 2: Advanced Semantic Search with Document Chunks
   # ============================================================================
   
   # CHALLENGE 2 (Part A): Semantic Policy Search Tool
@@ -72,11 +91,21 @@ tools:
         type: integer
         description: Maximum number of policy chunks to return (default 5)
     statement: |
-      -- CHALLENGE 2.1: Write a SQL query to search document_chunks for query_text ($1)
-      -- using LIKE (case-insensitive) and limit results by max_results ($2)
-      -- Expected columns: id, source_document_name, chunk_index, country, content
-      
-  # Utility for Challenge 2 (Kept complete)
+      SELECT
+        id,
+        source_document_name,
+        chunk_index,
+        country,
+        content
+      FROM
+        document_chunks
+      WHERE
+        LOWER(content) LIKE '%' || LOWER($1) || '%'
+      ORDER BY
+        chunk_index
+      LIMIT $2;
+
+  # CHALLENGE 2 (Part B): Country-Specific Policy Search
   search-policy-by-country:
     kind: postgres-sql
     source: benifix-alloydb-source
@@ -110,7 +139,7 @@ tools:
         chunk_index
       LIMIT $3;
 
-  # Utility for Challenge 2 (Kept complete)
+  # CHALLENGE 2 (Part C): List Available Countries
   list-policy-countries:
     kind: postgres-sql
     source: benifix-alloydb-source
@@ -131,7 +160,7 @@ tools:
         country;
 
   # ============================================================================
-  # CHALLENGE 3: Numerical & Predictive Analysis (Cost Forecast)
+  # CHALLENGE 3: Annual Cost Prediction Tools
   # ============================================================================
   
   # CHALLENGE 3 (Part A): Annual Cost Prediction - Benefits Data Retrieval
@@ -147,8 +176,16 @@ tools:
         type: string
         description: The unique identifier for the employee
     statement: |
-      -- CHALLENGE 3.1: Write a SQL query to retrieve plan name, deductible, OOP max, and HSA eligibility for employee_id ($1)
-      -- Expected columns: employee_id, plan_name, individual_deductible, individual_oop_max, hsa_eligible
+      SELECT
+        employee_id,
+        plan_name,
+        individual_deductible,
+        individual_oop_max,
+        hsa_eligible
+      FROM
+        benefits
+      WHERE
+        employee_id = $1;
 
   # CHALLENGE 3 (Part B): Usage Profile Data for Cost Estimation
   get-usage-profile-assumptions:
@@ -163,14 +200,54 @@ tools:
         type: string
         description: The usage profile type ('low', 'average', or 'high')
     statement: |
-      -- CHALLENGE 3.2: Write a SQL query to retrieve usage profiles by profile_type ($1)
-      -- Expected columns: profile_type, estimated_annual_visits, estimated_claims_amount, description
+      SELECT
+        profile_type,
+        estimated_annual_visits,
+        estimated_claims_amount,
+        description
+      FROM
+        usage_profiles
+      WHERE
+        LOWER(profile_type) = LOWER($1);
 
   # ============================================================================
-  # CHALLENGE 4: Places API Integration with Geocoding
+  # CHALLENGE 4: Proactive Deductible Alerts
   # ============================================================================
   
-  # CHALLENGE 4 (Part A): Get Provider Locations from Database
+  # CHALLENGE 4: Deductible Check for Alert Triggering
+  check-employee-deductible:
+    kind: postgres-sql
+    source: benifix-alloydb-source
+    description: >
+      Checks an employee's individual deductible amount for alert triggering.
+      Used to determine if proactive notifications should be sent to employees
+      with low deductibles who may benefit from high-deductible plan options.
+    parameters:
+      - name: employee_id
+        type: string
+        description: The unique identifier for the employee
+      - name: threshold
+        type: integer
+        description: The deductible threshold value for triggering alerts (e.g., 500)
+    statement: |
+      SELECT
+        employee_id,
+        plan_name,
+        individual_deductible,
+        CASE 
+          WHEN individual_deductible <= $2 THEN true
+          ELSE false
+        END as alert_eligible
+      FROM
+        benefits
+      WHERE
+        employee_id = $1;
+
+  # ============================================================================
+  # CHALLENGE 5: Google Places API Integration with Geocoding
+  # ============================================================================
+  
+  # CHALLENGE 5 (Part A): Get Provider Locations from Database
   get-provider-locations:
     kind: postgres-sql
     source: benifix-alloydb-source
@@ -186,11 +263,21 @@ tools:
         type: string
         description: Optional location filter (can be empty string)
     statement: |
-      -- CHALLENGE 5.1: Write a SQL query to get in-network provider name, specialty, and location 
-      -- by specialty ($1) and an optional location_filter ($2).
-      -- Expected columns: provider_name, specialty, location, network_status
+      SELECT
+        provider_name,
+        specialty,
+        location,
+        network_status
+      FROM
+        providers
+      WHERE
+        LOWER(specialty) LIKE '%' || LOWER($1) || '%'
+        AND (LOWER(location) LIKE '%' || LOWER($2) || '%' OR $2 = '')
+        AND network_status = 'IN_NETWORK'
+      ORDER BY
+        location, provider_name;
 
-  # CHALLENGE 4 (Part B): Find Nearest Provider by Street Address (Kept complete)
+  # CHALLENGE 5 (Part B): Find Nearest Provider by Street Address
   find-closest-provider-by-address:
     kind: http
     source: places-api-source
@@ -212,7 +299,7 @@ tools:
         type: string
         description: Search radius in meters (default 50000 for 50km, optional)
 
-  # CHALLENGE 4 (Part C): Find Nearest Provider by Coordinates (Kept complete)
+  # CHALLENGE 5 (Part C): Find Nearest Provider by Coordinates
   find-closest-provider-by-coordinates:
     kind: http
     source: places-api-source
@@ -238,9 +325,33 @@ tools:
         description: Search radius in meters (default 50000 for 50km, optional)
 
   # ============================================================================
-  # ADDITIONAL UTILITY TOOLS (Kept complete)
+  # ADDITIONAL UTILITY TOOLS
   # ============================================================================
   
+  # Support Ticket Status Tool
+  get-support-ticket-status:
+    kind: postgres-sql
+    source: benifix-alloydb-source
+    description: >
+      Fetches the current status and summary of a specific Benifix support ticket.
+      Returns ticket ID, status, priority, and description.
+    parameters:
+      - name: ticket_id
+        type: integer
+        description: The unique identifier for the support ticket
+    statement: |
+      SELECT
+        ticket_id,
+        status,
+        priority,
+        subject,
+        description,
+        created_date,
+        last_updated
+      FROM
+        support_tickets
+      WHERE
+        ticket_id = $1;
 
   # Get All Benefits Plans Summary
   get-all-benefits-summary:
@@ -264,20 +375,47 @@ tools:
       ORDER BY
         plan_name;
 
-  
+  # Search Support Tickets by Status
+  search-support-tickets:
+    kind: postgres-sql
+    source: benifix-alloydb-source
+    description: >
+      Searches for support tickets by status (open, in_progress, resolved).
+      Returns ticket details for tracking and management.
+    parameters:
+      - name: status
+        type: string
+        description: The ticket status to filter by (e.g., 'open', 'in_progress', 'resolved')
+    statement: |
+      SELECT
+        ticket_id,
+        status,
+        priority,
+        subject,
+        created_date,
+        last_updated
+      FROM
+        support_tickets
+      WHERE
+        LOWER(status) = LOWER($1)
+      ORDER BY
+        priority DESC, created_date DESC
+      LIMIT 20;
 
 # ============================================================================
-# TOOLSET DEFINITIONS - Grouping Related Tools by Challenge (Kept complete)
+# TOOLSET DEFINITIONS - Grouping Related Tools by Challenge
 # ============================================================================
 
 toolsets:
   # Main benefits assistant with core functionality
   benifix-benefits-assistant:
+    - get-support-ticket-status
     - find-providers
     - get-employee-benefits
     - get-employee-plan-details
     - check-employee-deductible
     - get-all-benefits-summary
+    - search-support-tickets
   
   # Challenge 2: Policy search and document analysis
   benifix-policy-search:
@@ -290,8 +428,11 @@ toolsets:
     - get-employee-plan-details
     - get-usage-profile-assumptions
   
+  # Challenge 4: Proactive alerts
+  benifix-deductible-alerts:
+    - check-employee-deductible
   
-  # Challenge 4: Provider network with location services
+  # Challenge 5: Provider network with location services
   benifix-provider-network:
     - find-providers
     - get-provider-locations

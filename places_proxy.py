@@ -4,7 +4,7 @@ import requests
 app = Flask(__name__)
 
 # Replace with your actual API key
-GOOGLE_MAPS_API_KEY = "<API_Key_Here>"
+GOOGLE_MAPS_API_KEY = "AIzaSyBcR__DWZACouW-ACPSeNdGEFI8LMlt4sw"
 
 def geocode_address(address):
     """
